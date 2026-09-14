@@ -1,0 +1,274 @@
+﻿generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum UserType {
+  FILMMAKER
+  CREW_MEMBER
+  BOTH
+}
+
+enum ProjectStatus {
+  DRAFT
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ApplicationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum RoleSlotStatus {
+  OPEN
+  FILLED
+}
+
+enum NotificationType {
+  APPLICATION_RECEIVED
+  APPLICATION_ACCEPTED
+  APPLICATION_REJECTED
+  REVIEW_RECEIVED
+  FOLLOW_RECEIVED
+  PROJECT_UPDATED
+  GENERAL
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  username     String   @unique
+  role         Role     @default(USER)
+  userType     UserType @default(BOTH)
+  isVerified   Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  profile          Profile?
+  projects         Project[]
+  applications     Application[]
+  reviewsGiven     Review[]       @relation("ReviewGiver")
+  reviewsReceived  Review[]       @relation("ReviewReceiver")
+  followers        Follow[]       @relation("Following")
+  following        Follow[]       @relation("Follower")
+  notifications    Notification[]
+  reportsSubmitted Report[]       @relation("ReportSubmitter")
+  reportsAgainst   Report[]       @relation("ReportTarget")
+  scripts          Script[]
+
+  @@map("users")
+}
+
+model Profile {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio          String?
+  profileImage String?
+  location     String?
+  availability Boolean  @default(true)
+  roles        String[]
+  skills       String[]
+  languages    String[]
+  imdbUrl      String?
+  linkedinUrl  String?
+  instagramUrl String?
+  portfolioUrl String?
+  websiteUrl   String?
+  trustScore   Float    @default(0)
+  totalReviews Int      @default(0)
+  pastWork     PastWork[]
+  awards       Award[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("profiles")
+}
+
+model PastWork {
+  id          String   @id @default(cuid())
+  profileId   String
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title       String
+  role        String
+  year        Int?
+  description String?
+  url         String?
+  createdAt   DateTime @default(now())
+
+  @@map("past_works")
+}
+
+model Award {
+  id          String   @id @default(cuid())
+  profileId   String
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title       String
+  festival    String?
+  year        Int?
+  description String?
+  createdAt   DateTime @default(now())
+
+  @@map("awards")
+}
+
+model Project {
+  id           String        @id @default(cuid())
+  filmakerId   String
+  filmmaker    User          @relation(fields: [filmakerId], references: [id], onDelete: Cascade)
+  title        String
+  description  String
+  genre        String[]
+  language     String[]
+  runtime      Int?
+  location     String?
+  compensation String?
+  status       ProjectStatus @default(OPEN)
+  festivalId   String?
+  festival     Festival?     @relation(fields: [festivalId], references: [id])
+  roleSlots    RoleSlot[]
+  scripts      Script[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@map("projects")
+}
+
+model RoleSlot {
+  id             String         @id @default(cuid())
+  projectId      String
+  project        Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  roleName       String
+  description    String?
+  requiredSkills String[]
+  status         RoleSlotStatus @default(OPEN)
+  applications   Application[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@map("role_slots")
+}
+
+model Application {
+  id          String            @id @default(cuid())
+  roleSlotId  String
+  roleSlot    RoleSlot          @relation(fields: [roleSlotId], references: [id], onDelete: Cascade)
+  applicantId String
+  applicant   User              @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  coverLetter String?
+  status      ApplicationStatus @default(PENDING)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([roleSlotId, applicantId])
+  @@map("applications")
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  giverId    String
+  giver      User     @relation("ReviewGiver", fields: [giverId], references: [id], onDelete: Cascade)
+  receiverId String
+  receiver   User     @relation("ReviewReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now())
+
+  @@unique([giverId, receiverId])
+  @@map("reviews")
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  follower    User     @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  followingId String
+  following   User     @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+  @@map("follows")
+}
+
+model Festival {
+  id            String    @id @default(cuid())
+  name          String
+  description   String?
+  genre         String[]
+  language      String[]
+  maxRuntime    Int?
+  deadline      DateTime
+  entryFee      Float?    @default(0)
+  submissionUrl String?
+  location      String?
+  isActive      Boolean   @default(true)
+  projects      Project[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("festivals")
+}
+
+model Script {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
+  title     String
+  fileUrl   String
+  fileSize  Int
+  isPublic  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("scripts")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  message   String
+  isRead    Boolean          @default(false)
+  link      String?
+  createdAt DateTime         @default(now())
+
+  @@map("notifications")
+}
+
+model Report {
+  id          String       @id @default(cuid())
+  submitterId String
+  submitter   User         @relation("ReportSubmitter", fields: [submitterId], references: [id], onDelete: Cascade)
+  targetId    String
+  target      User         @relation("ReportTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  reason      String
+  description String?
+  status      ReportStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("reports")
+}
